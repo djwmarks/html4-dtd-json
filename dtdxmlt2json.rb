@@ -189,31 +189,26 @@ def add_attlist(obj, el)
   end
 end
 
-['strict', 'loose', 'frameset'].each do |dtd_name|
-  dtd_json = {:entity => {}, :element => {}}
+dtd_name = ARGV[0]
+dtd_json = {:entity => {}, :element => {}}
+doc = REXML::Document.new(File.read(dtd_name))
 
-  puts ">> #{dtd_name}"
-  doc = REXML::Document.new(File.read(dtd_name + '.dtd.xml'))
-
-  doc.root.elements.each('entity') do |entity|
-    add_entity(dtd_json[:entity], entity)
-  end
-
-  doc.root.elements.each('element') do |element|
-    add_element(dtd_json[:element], element)
-  end
-
-  doc.root.elements.each('attlist') do |attlist|
-    element_name = attlist.attribute('name').value.downcase
-    element = dtd_json[:element][element_name]
-    if element.nil?
-      throw 'Unknown element type: ' + element_name
-    end
-
-    add_attlist(element, attlist) 
-  end
-
-  File.open(dtd_name + '.json', 'w') do |f|
-    f.write(dtd_json.to_json)
-  end
+doc.root.elements.each('entity') do |entity|
+  add_entity(dtd_json[:entity], entity)
 end
+
+doc.root.elements.each('element') do |element|
+  add_element(dtd_json[:element], element)
+end
+
+doc.root.elements.each('attlist') do |attlist|
+  element_name = attlist.attribute('name').value.downcase
+  element = dtd_json[:element][element_name]
+  if element.nil?
+    throw 'Unknown element type: ' + element_name
+  end
+
+  add_attlist(element, attlist) 
+end
+
+puts dtd_json.to_json
