@@ -2,10 +2,18 @@ DTDPARSE=dtdparse
 DTDPARSE_FLAGS=--declaration sgmldecl --nounexpanded
 RUBY19=ruby
 
-all: ruby
+all: json
 
-ruby: dtdparse
-	${RUBY19} dtdxmlt2json.rb
+json: strict.json loose.json frameset.json
+
+strict.json: strict.dtd.xml dtdxmlt2json.rb
+	${RUBY19} dtdxmlt2json.rb strict.dtd.xml > strict.json
+
+loose.json: loose.dtd.xml dtdxmlt2json.rb
+	${RUBY19} dtdxmlt2json.rb loose.dtd.xml > loose.json
+
+frameset.json: frameset.dtd.xml dtdxmlt2json.rb
+	${RUBY19} dtdxmlt2json.rb frameset.dtd.xml > frameset.json
 
 dtdparse: strict.dtd.xml loose.dtd.xml frameset.dtd.xml
 
