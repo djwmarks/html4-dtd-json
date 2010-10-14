@@ -1,0 +1,31 @@
+It's useful to be able to inspect HTML DTDs without the need for a DTD
+parser. So I've created these JSON format representations of the HTML
+4.01 DTDs. The process was:
+
+ 1. Use dtdparse to convert the DTDs into an XML format.
+
+dtdparse --declaration sgmldecl --nounexpanded <DTD> > <OUT>.dtd.xml
+
+ 2. Write a Ruby script that uses REXML to tear out just enough of the
+    structure of the output of dtdparse to capture all of the information.
+    This builds an object hierarchy that is serialised to JSON.
+
+  Requires: rexml, json.
+
+Please note that the Ruby script has only been tested with these DTDs as
+inputs. It won't work for other files produced from dtdparse without some
+hacking.
+
+Also, the JSON files aren't exact representations of the originals. I
+haven't included all of the entity references in the output, for example.
+If you need more you should be able to add this in with minimal effort.
+See the source for details.
+
+Send me your patches if you extend the script to be more complete!
+
+If you want to build the JSON files yourself you'll need to grab the DTD
+files and the entity reference files (.ent) from w3.org. The sgmldecl is
+also on their site.
+
+--
+Dom Marks
