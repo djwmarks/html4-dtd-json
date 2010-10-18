@@ -26,8 +26,43 @@ def add_entity(obj, el)
   end
 end
 
+def cdata(arr, el)
+  arr << {:name => :cdata}
+end
+
+def element(arr, el)
+  element = {:name => el.attribute('name').value.downcase}
+  if el.attribute('occurrence')
+    element[:occurrence] = el.attribute('occurrence').value
+  end
+
+  arr << {:name => :element, :model => element}
+end
+
+def and_group(arr, el)
+  and_group = {:children => []}
+  if el.attribute('occurrence')
+    and_group[:occurrence] = el.attribute('occurrence').value
+  end
+ 
+  el.elements.each do |and_group_child|
+    case and_group_child.name
+    when 'or-group'
+      or_group(and_group[:children], and_group_child)
+
+    when 'element-name'
+      element(and_group[:children], and_group_child)
+
+    else
+      throw 'Unknown child element type (and group).'
+    end
+  end
+
+  arr << {:name => :andGroup, :model => and_group}
+end
+
 def or_group(arr, el)
-  or_group = {:children => [], :elements => [], :text => false}
+  or_group = {:children => []}
   if el.attribute('occurrence')
     or_group[:occurrence] = el.attribute('occurrence').value
   end
@@ -35,28 +70,31 @@ def or_group(arr, el)
   el.elements.each do |or_group_child|
     case or_group_child.name
     when 'element-name'
-      or_group[:elements] << or_group_child.attribute('name').value.downcase
+      element(or_group[:children], or_group_child)
+
       next
     when 'pcdata'
-      or_group[:text] = true
+      or_group[:children] << {:text => true}
+
       next
     when 'or-group'
       or_group(or_group[:children], or_group_child)
+
       next
     else
       throw 'Unknown child element type (or group).'
     end
   end
 
-  arr << {:orGroup => or_group} 
+  arr << {:name => :orGroup, :model => or_group} 
 end
 
 def sequence_group(arr, el)
-  sequence_group = {:children => [], :elements => [], :text => false}
+  sequence_group = {:children => []}
   el.elements.each do |seq_group_child|
     case seq_group_child.name
     when 'element-name'
-      sequence_group[:elements] << seq_group_child.attribute('name').value.downcase
+      element(sequence_group[:children], seq_group_child)
       
       next
     when 'or-group'
@@ -64,14 +102,14 @@ def sequence_group(arr, el)
 
       next
     when 'pcdata'
-      sequence_group[:text] = true
+      sequence_group[:children] << {:text => true}
 
       next
     else
       throw 'Unknown child element type (sequence group).'
     end
   end
-  arr << {:sequenceGroup => sequence_group}
+  arr << {:name => :sequenceGroup, :model => sequence_group}
 end
 
 def add_element(obj, el)
@@ -85,7 +123,7 @@ def add_element(obj, el)
     :cdata => false,
     :childElements => [],
     :contentType => content_type,
-    :contentModel => {},
+    :model => {},
     :empty => false,
     :omitStart=> start_tag_omit,
     :omitEnd => end_tag_omit,
@@ -107,23 +145,7 @@ def add_element(obj, el)
       child.elements.each do |cme_child|
         case cme_child.name
         when 'and-group'
-          and_group = []
-          cme_child.elements.each do |and_group_child|
-            case and_group_child
-            when 'or-group'
-              or_group(and_group, and_group_child)
-
-            when 'element-name'
-              and_child = {
-                :name => and_group_child.attribute('name').value.downcase,
-              }
-              if and_group_child.attribute('occurrence') 
-                and_child[:occurrence] = and_group_child.attribute('occurrence').value
-              end
-              and_group << and_child
-            end
-          end
-          cme << {:andGroup => and_group}
+          and_group(cme, cme_child)
 
         when 'or-group'
           or_group(cme, cme_child)
@@ -132,13 +154,13 @@ def add_element(obj, el)
           sequence_group(cme, cme_child)
 
         when 'cdata'
-          element[:cdata] = true
+          cdata(cme, cme_child)
 
         else
           throw 'Unknown child element type (content model expanded).'
         end
       end
-      element[:contentModel][:expanded] = cme
+      element[:model][:expanded] = cme
 
     when 'inclusions'
       incs = []
@@ -151,7 +173,7 @@ def add_element(obj, el)
           throw 'Unknown child element type (inclusions).'
         end
       end
-      element[:contentModel][:inclusions] = incs
+      element[:model][:inclusions] = incs
 
     when 'exclusions'
       excs = []
@@ -167,7 +189,7 @@ def add_element(obj, el)
           throw 'Unknown child element type (exclusions).'
         end
       end
-      element[:contentModel][:exclusions] = excs
+      element[:model][:exclusions] = excs
     else
       throw 'Unknown child element type'
     end
@@ -180,16 +202,21 @@ def add_attlist(obj, el)
   el.elements.each do |child|
     next if child.name == 'attdecl'
 
-    name = child.attribute('name').value
-    type = child.attribute('type').value
-    default = child.attribute('default').value
-    value = child.attribute('value').value
+    name = child.attribute('name').value.downcase
+    type = child.attribute('type').value.downcase
+    default = child.attribute('default').value.downcase
+    value = child.attribute('value').value.downcase
 
     obj[:attributes][name] = {:default => default, :type => type, :value => value}
   end
 end
 
 dtd_name = ARGV[0]
+if dtd_name.nil?
+  puts "No .dtd.xml file given as parameter?"
+  exit
+end
+
 dtd_json = {:entity => {}, :element => {}}
 doc = REXML::Document.new(File.read(dtd_name))
 
